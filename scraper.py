@@ -1,14 +1,12 @@
-# scraper.py — Phase 1 with JOA replacing Jobvetta
 import os, csv, requests, pandas as pd
 from datetime import datetime
 from jobspy import scrape_jobs
 from hirehunt import scrape_jobs as hirehunt_scrape
 from config import ROLE_GROUPS, LOCATION, RESULTS_PER_QUERY, JOA_QUERIES
 
-# --- credentials ---
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
-JOA_API_KEY = os.environ["JOA_API_KEY"]  # new secret
+JOA_API_KEY = os.environ["JOA_API_KEY"]
 
 FIELDS = ["company", "title", "location", "url", "source", "role_group", "date_found", "snippet"]
 
@@ -19,11 +17,11 @@ def normalize(title, company, location, url, source, role_group, snippet=""):
         date_found=datetime.utcnow().strftime("%Y-%m-%d"), snippet=snippet[:300],
     )
 
-# --- 1. JobSpy (broad scraping) ---
+# 1) JobSpy — broad board scraping
 def scrape_jobspy():
     out = []
     for group, terms in ROLE_GROUPS.items():
-        for term in terms[:2]:  # 2 terms per group to stay polite
+        for term in terms[:2]:
             try:
                 df = scrape_jobs(
                     site_name=["linkedin", "indeed", "naukri"],
@@ -43,20 +41,20 @@ def scrape_jobspy():
                 print(f"jobspy failed for {term}: {e}")
     return out
 
-# --- 2. HireHunt (India-focused) ---
+# 2) HireHunt — India-focused boards
 def scrape_hirehunt():
     out = []
     for group in ["swe_junior", "ai_genai", "data_engineering", "devops_cloud", "internships"]:
         term = ROLE_GROUPS[group][0]
         try:
-            jobs = hirehunt_scrape(
+            result = hirehunt_scrape(
                 search_term=term,
                 sources=["internshala", "naukri", "shine", "unstop"],
                 country="India",
                 results_wanted=RESULTS_PER_QUERY,
                 job_kind="internship" if group == "internships" else "job",
             )
-            for j in jobs:
+            for j in result.jobs:
                 out.append(normalize(
                     j.title, j.company, j.city or j.location,
                     j.job_url, j.source, group, j.description or "",
@@ -65,15 +63,16 @@ def scrape_hirehunt():
             print(f"hirehunt failed for {term}: {e}")
     return out
 
-# --- 3. JOA (replaces Jobvetta) ---
+# 3) JOA — corrected endpoint, parameter, and response key
 def scrape_joa():
     if not JOA_API_KEY:
         return []
     headers = {"Authorization": f"Bearer {JOA_API_KEY}"}
     out = []
-    # pick 8 highest-priority groups to stay within monthly record cap
-    priority_groups = ["swe_junior", "ai_genai", "backend", "fullstack",
-                       "frontend", "data_engineering", "devops_cloud", "internships"]
+    priority_groups = [
+        "swe_junior", "ai_genai", "backend", "fullstack",
+        "frontend", "data_engineering", "devops_cloud", "internships",
+    ]
     for group in priority_groups[:JOA_QUERIES]:
         term = ROLE_GROUPS[group][0]
         try:
@@ -89,17 +88,17 @@ def scrape_joa():
             if resp.status_code == 402:
                 print("JOA: monthly record limit reached")
                 break
-            data = resp.json()
-            for job in r.json()["data"]:
+            resp.raise_for_status()
+            for job in resp.json().get("data", []):
                 out.append(normalize(
                     job.get("title"), job.get("company"), job.get("location"),
-                    job.get("url"), "joa", group, job.get("description", "")[:300],
+                    job.get("apply_url") or job.get("url"), "joa", group,
+                    job.get("description", "")[:300],
                 ))
         except Exception as e:
             print(f"JOA failed for {group}: {e}")
     return out
 
-# --- dedupe + save ---
 def dedupe(jobs, existing_urls):
     seen = set(existing_urls)
     fresh = []
@@ -112,11 +111,13 @@ def dedupe(jobs, existing_urls):
 def save(fresh):
     path = "data/jobs.csv"
     write_header = not os.path.exists(path)
+    os.makedirs("data", exist_ok=True)
     with open(path, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         if write_header:
             writer.writeheader()
         writer.writerows(fresh)
+
     day = datetime.utcnow().strftime("%Y-%m-%d")
     os.makedirs(f"inbox/{day}", exist_ok=True)
     for j in fresh[:20]:
