@@ -3,12 +3,9 @@ import os, csv, requests, pandas as pd
 from datetime import datetime
 from jobspy import scrape_jobs
 from hirehunt import scrape_jobs as hirehunt_scrape
+from config import *
 from scorer import compute_fit, llm_enhance
-from config import (
-    ROLE_GROUPS, PRIORITY_GROUPS_JOBSPY, LOCATION, RESULTS_PER_QUERY,
-    JOA_QUERIES, MIN_SCORE_MARKDOWN, MIN_SCORE_TELEGRAM,
-    MAX_TELEGRAM_JOBS, MAX_MARKDOWN_PER_RUN, MAX_CSV_ROWS,
-)
+from tailor import generate_application_packet
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
@@ -26,18 +23,6 @@ def normalize(title, company, location, url, source, role_group, snippet=""):
                 url=url or "", source=source or "", role_group=role_group,
                 date_found=datetime.utcnow().strftime("%Y-%m-%d"), snippet=snippet[:300])
 
-def rotate_csv_if_needed():
-    if not os.path.exists(CSV_PATH): return
-    try: df = pd.read_csv(CSV_PATH)
-    except: return
-    
-    # Rotate if schema changed OR file is too big
-    if "llm_explanation" not in df.columns or len(df) >= MAX_CSV_ROWS:
-        os.makedirs(ARCHIVE_DIR, exist_ok=True)
-        stamp = datetime.utcnow().strftime("%Y%m")
-        os.rename(CSV_PATH, os.path.join(ARCHIVE_DIR, f"jobs_legacy_{stamp}.csv"))
-        print(f"Archived old CSV to {ARCHIVE_DIR}")
-
 def scrape_jobspy():
     out = []
     for group in PRIORITY_GROUPS_JOBSPY:
@@ -45,73 +30,60 @@ def scrape_jobspy():
         try:
             df = scrape_jobs(site_name=["linkedin", "indeed", "naukri"], search_term=term,
                              location=LOCATION, results_wanted=RESULTS_PER_QUERY,
-                             country_indeed="India", linkedin_fetch_description=False, verbose=0)
+                             country_indeed="India", verbose=0)
             for _, row in df.iterrows():
-                out.append(normalize(row.get("title"), row.get("company"), row.get("location"),
-                                     row.get("job_url"), row.get("site"), group))
-        except Exception as e: 
-            print(f"jobspy failed for {term}: {e}")
+                out.append(normalize(row.get("title"), row.get("company"), row.get("location"), row.get("job_url"), row.get("site"), group))
+        except Exception as e: print(f"jobspy failed: {e}")
     return out
 
 def scrape_hirehunt():
     out = []
-    for group in ["swe_junior", "ai_genai", "data_engineering", "devops_cloud", "internships"]:
+    for group in ["swe_junior", "ai_genai", "internships"]:
         term = ROLE_GROUPS[group][0]
         try:
-            result = hirehunt_scrape(search_term=term, sources=["internshala", "naukri", "shine", "unstop"],
+            result = hirehunt_scrape(search_term=term, sources=["internshala", "naukri", "unstop"],
                                      country="India", results_wanted=RESULTS_PER_QUERY,
                                      job_kind="internship" if group == "internships" else "job")
             for j in result.jobs:
                 out.append(normalize(j.title, j.company, j.city or j.location, j.job_url, j.source, group, j.description or ""))
-        except Exception as e: 
-            print(f"hirehunt failed for {term}: {e}")
+        except Exception as e: print(f"hirehunt failed: {e}")
     return out
 
 def scrape_joa():
     if not JOA_API_KEY: return []
     headers = {"Authorization": f"Bearer {JOA_API_KEY}"}
     out = []
-    priority = ["swe_junior", "ai_genai", "backend", "fullstack", "frontend", "data_engineering"]
-    for group in priority[:JOA_QUERIES]:
+    for group in PRIORITY_GROUPS_JOBSPY[:JOA_QUERIES]:
         term = ROLE_GROUPS[group][0]
         try:
             resp = requests.get("https://api.jobopportunitiesapi.org/v1/jobs", headers=headers,
                                 params={"title": term, "country": "IN", "limit": 5}, timeout=30)
-            if resp.status_code == 401: break
-            if resp.status_code == 402: break
-            resp.raise_for_status()
+            if resp.status_code in [401, 402]: break
             for job in resp.json().get("data", []):
-                out.append(normalize(job.get("title"), job.get("company"), job.get("location"),
-                                     job.get("apply_url") or job.get("url"), "joa", group, job.get("description", "")[:300]))
-        except Exception as e: 
-            print(f"JOA failed for {group}: {e}")
+                out.append(normalize(job.get("title"), job.get("company"), job.get("location"), job.get("apply_url"), "joa", group, job.get("description", "")[:300]))
+        except Exception as e: print(f"JOA failed: {e}")
     return out
 
-def dedupe(jobs, existing_urls):
-    seen = set(existing_urls)
-    fresh = []
-    for j in jobs:
-        if j["url"] and j["url"] not in seen:
-            seen.add(j["url"])
-            fresh.append(j)
-    return fresh
-
-def save(fresh):
-    # 1. Base rule scoring
+def main():
+    existing = pd.read_csv(CSV_PATH)["url"].dropna().tolist() if os.path.exists(CSV_PATH) else []
+    
+    jobs = scrape_jobspy() + scrape_hirehunt() + scrape_joa()
+    
+    # Dedupe
+    seen = set(existing)
+    fresh = [j for j in jobs if j["url"] and j["url"] not in seen]
+    
     for j in fresh:
         j["fit_score"], j["fit_reason"] = compute_fit(j)
-
-    # 2. LLM enhancement for top candidates only
-    top_candidates = sorted([j for j in fresh if j["fit_score"] >= MIN_SCORE_TELEGRAM], key=lambda x: x["fit_score"], reverse=True)[:15]
-    for j in top_candidates:
-        j["llm_explanation"], j["llm_gaps"] = llm_enhance(j)
+        j["llm_explanation"], j["llm_gaps"] = "", ""
         
-    # Fill defaults for the rest
-    for j in fresh:
-        if "llm_explanation" not in j:
-            j["llm_explanation"], j["llm_gaps"] = "", ""
+    # LLM + Tailoring for top jobs
+    top_jobs = sorted([j for j in fresh if j["fit_score"] >= MIN_SCORE_TELEGRAM], key=lambda x: x["fit_score"], reverse=True)[:5]
+    for j in top_jobs:
+        j["llm_explanation"], j["llm_gaps"] = llm_enhance(j)
+        generate_application_packet(j) # Create PDF
 
-    # 3. Save to CSV
+    # Save CSV
     os.makedirs(DATA_DIR, exist_ok=True)
     write_header = not os.path.exists(CSV_PATH)
     with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
@@ -119,44 +91,21 @@ def save(fresh):
         if write_header: w.writeheader()
         w.writerows(fresh)
 
-    # 4. Save Markdown files
-    good = [j for j in fresh if j["fit_score"] >= MIN_SCORE_MARKDOWN]
-    good = sorted(good, key=lambda x: x["fit_score"], reverse=True)[:MAX_MARKDOWN_PER_RUN]
+    # Markdown + Telegram
+    good = sorted([j for j in fresh if j["fit_score"] >= MIN_SCORE_MARKDOWN], key=lambda x: x["fit_score"], reverse=True)[:MAX_TELEGRAM_JOBS]
+    if good:
+        day_dir = os.path.join(INBOX_DIR, datetime.utcnow().strftime("%Y-%m-%d"))
+        os.makedirs(day_dir, exist_ok=True)
+        lines = [f"*🔥 {len(good)} High-Fit Roles Found*"]
+        
+        for j in good:
+            safe = f"{j['company']}_{j['title']}".replace("/", "_")[:80]
+            with open(os.path.join(day_dir, f"{safe}.md"), "w", encoding="utf-8") as f:
+                f.write(f"# {j['title']} @ {j['company']}\n\n**Score:** {j['fit_score']}/10\n**Why:** {j['llm_explanation']}\n**Gaps:** {j['llm_gaps']}\n**URL:** {j['url']}")
+            lines.append(f"⭐ [{j['fit_score']}/10] [{j['title']} @ {j['company']}]({j['url']})\n_{j['llm_explanation']}_")
 
-    day = datetime.utcnow().strftime("%Y-%m-%d")
-    day_dir = os.path.join(INBOX_DIR, day)
-    os.makedirs(day_dir, exist_ok=True)
-    for j in good:
-        safe = f"{j['company']}_{j['title']}".replace("/", "_")[:80]
-        with open(os.path.join(day_dir, f"{safe}.md"), "w", encoding="utf-8") as f:
-            f.write(f"# {j['title']} @ {j['company']}\n\n"
-                    f"- **Fit:** {j['fit_score']}/10\n"
-                    f"- **Why:** {j['llm_explanation'] or j['fit_reason']}\n"
-                    f"- **Gaps:** {j['llm_gaps']}\n"
-                    f"- URL: {j['url']}\n- Source: {j['source']}\n\n{j['snippet']}\n")
-
-def telegram(fresh):
-    good = [j for j in fresh if j["fit_score"] >= MIN_SCORE_TELEGRAM]
-    if not good: return
-    good = sorted(good, key=lambda x: x["fit_score"], reverse=True)[:MAX_TELEGRAM_JOBS]
-    
-    lines = [f"*{len(good)} Top-Fit Roles Found*"]
-    for i, j in enumerate(good):
-        prefix = "⭐" if i < 5 else "•"
-        lines.append(f"{prefix} [{j['fit_score']}/10] [{j['title']} @ {j['company']}]({j['url']})\n_{j['fit_reason']}_")
-    
-    requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-                  json={"chat_id": TELEGRAM_CHAT_ID, "text": "\n\n".join(lines),
-                        "parse_mode": "Markdown", "disable_web_page_preview": True}, timeout=20)
-
-def main():
-    rotate_csv_if_needed()
-    existing = pd.read_csv(CSV_PATH)["url"].dropna().tolist() if os.path.exists(CSV_PATH) else []
-    jobs = scrape_jobspy() + scrape_hirehunt() + scrape_joa()
-    fresh = dedupe(jobs, existing)
-    save(fresh)
-    telegram(fresh)
-    print(f"Scraped {len(jobs)} → fresh {len(fresh)} → saved")
+        requests.post(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                      json={"chat_id": TELEGRAM_CHAT_ID, "text": "\n\n".join(lines), "parse_mode": "Markdown"}, timeout=20)
 
 if __name__ == "__main__":
     main()

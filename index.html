@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Autonomous Job Copilot</title>
+<style>
+:root{--bg:#f5f7fb;--panel:#fff;--ink:#172033;--muted:#64748b;--line:#dbe2ed;--accent:#315efb;--accent2:#eaf0ff;--green:#147d52;--red:#b42318}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+header{background:#101a32;color:#fff;padding:24px max(20px,calc((100vw - 1240px)/2));display:flex;align-items:center;justify-content:space-between}
+h1{font-size:26px;margin:0}header p{margin:4px 0 0;color:#c8d3ee}
+button,.button{border:0;border-radius:9px;background:var(--accent);color:white;padding:10px 14px;font-weight:650;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+button.secondary{background:var(--accent2);color:#1e40af}
+main{max-width:1240px;margin:22px auto;padding:0 18px 40px}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px}.nav button{background:#e7ebf3;color:#334155}.nav button.active{background:var(--accent);color:white}
+.view{display:none}.view.active{display:block}.grid{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}.card{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:18px;box-shadow:0 2px 8px #15244708}.span-12{grid-column:span 12}.span-6{grid-column:span 6}.span-4{grid-column:span 4}
+h2{font-size:19px;margin:0 0 12px}input,textarea,select{width:100%;border:1px solid #cbd5e1;border-radius:8px;padding:10px;font:inherit;margin-bottom:10px}
+.item{border:1px solid var(--line);border-radius:11px;padding:13px;margin-bottom:10px}.itemtop{display:flex;justify-content:space-between}.itemtitle{font-weight:750}
+.pill{display:inline-block;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:700}.pill.green{background:#e6f7ef;color:#116444}.pill.amber{background:#fff4d6;color:#805b00}
+</style></head>
+<body>
+<header>
+  <div><h1>Autonomous Job Copilot</h1><p>Cloud-Synced · AI Powered</p></div>
+  <div>
+    <button class="secondary" onclick="showView('settings')">⚙️ Settings</button>
+    <button class="secondary" onclick="syncCloud()">☁️ Sync Cloud</button>
+    <button onclick="triggerBot()">🚀 Run Bot Now</button>
+  </div>
+</header>
+<main>
+<div class="nav" id="nav">
+<button class="active" data-view="cloud-jobs">Cloud Pipeline</button>
+<button data-view="tailor">AI Match & Tailor</button>
+<button data-view="settings">Settings</button>
+</div>
+
+<section id="cloud-jobs" class="view active">
+  <div class="grid">
+    <div class="card span-12">
+      <h2>AI-Filtered Cloud Jobs</h2>
+      <div id="cloudJobList">Loading...</div>
+    </div>
+  </div>
+</section>
+
+<section id="tailor" class="view">
+  <div class="grid">
+    <div class="card span-6">
+      <h2>Job Description</h2>
+      <input id="mTitle" placeholder="Role — Company">
+      <textarea id="jobDescription" style="height:200px" placeholder="Paste JD here..."></textarea>
+      <button onclick="aiTailor()">✨ Generate Tailored Resume & Cover Letter</button>
+    </div>
+    <div class="card span-6">
+      <h2>AI Output</h2>
+      <textarea id="draftOutput" style="height:300px" placeholder="Output..."></textarea>
+    </div>
+  </div>
+</section>
+
+<section id="settings" class="view">
+  <div class="card span-12">
+    <h2>Settings</h2>
+    <label>GitHub Username</label><input id="ghUser">
+    <label>Repo Name</label><input id="ghRepo" value="job-command-center">
+    <label>GitHub PAT</label><input id="ghToken" type="password">
+    <label>Gemini API Key</label><input id="geminiKey" type="password">
+    <button onclick="saveSettings()">Save Settings</button>
+  </div>
+</section>
+</main>
+
+<script>
+const KEY='jobCopilot_v3';
+let state=JSON.parse(localStorage.getItem(KEY)||'{}');
+if(!state.cloudJobs) state.cloudJobs=[];
+
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===b.dataset.view));
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x===b));
+}));
+function showView(id){document.getElementById('nav').querySelector(`[data-view="${id}"]`).click();}
+
+function saveSettings(){
+  localStorage.setItem(KEY, JSON.stringify({
+    ...state, settings:{ghUser:ghUser.value, ghRepo:ghRepo.value, ghToken:ghToken.value, geminiKey:geminiKey.value}
+  }));
+  alert('Saved!');
+}
+if(state.settings){
+  ghUser.value=state.settings.ghUser||''; ghRepo.value=state.settings.ghRepo||'job-command-center';
+  ghToken.value=state.settings.ghToken||''; geminiKey.value=state.settings.geminiKey||'';
+}
+
+async function syncCloud(){
+  const {ghUser, ghRepo} = state.settings;
+  if(!ghUser) return alert('Set GitHub Username in settings!');
+  try {
+    const res = await fetch(`https://raw.githubusercontent.com/${ghUser}/${ghRepo}/main/job_data/jobs.csv`);
+    if(!res.ok) throw new Error("Could not find jobs.csv. Run the bot first.");
+    const csv = await res.text();
+    const lines = csv.split('\n').filter(l=>l.trim());
+    const headers = lines[0].split(',');
+    const jobs = lines.slice(1).map(line => {
+      const cols = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+      let obj = {}; headers.forEach((h, i) => obj[h.trim()] = cols[i] ? cols[i].replace(/^"|"$/g, '') : ''); return obj;
+    });
+    state.cloudJobs = jobs.reverse(); localStorage.setItem(KEY, JSON.stringify(state));
+    renderCloudJobs(); alert(`Synced ${jobs.length} jobs!`);
+  } catch(e) { alert(e.message); }
+}
+
+function renderCloudJobs(){
+  const el = document.getElementById('cloudJobList');
+  if(!state.cloudJobs.length) return el.innerHTML = '<p>No jobs synced. Click "Sync Cloud".</p>';
+  el.innerHTML = state.cloudJobs.map((j, i) => `
+    <div class="item">
+      <div class="itemtop">
+        <div>
+          <div class="itemtitle">${j.title} — ${j.company}</div>
+          <div style="font-size:12px;color:#666">${j.location} · ${j.source}</div>
+          <p><b>AI Fit:</b> ${j.llm_explanation || j.fit_reason}</p>
+          <p><b>Gaps:</b> ${j.llm_gaps || 'None'}</p>
+        </div>
+        <div style="text-align:right">
+          <span class="pill ${j.fit_score>=8?'green':'amber'}">Score: ${j.fit_score}/10</span><br><br>
+          <button onclick="applyFromCloud(${i})">Apply & Tailor</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function applyFromCloud(index){
+  const j = state.cloudJobs[index];
+  mTitle.value = `${j.title} — ${j.company}`;
+  jobDescription.value = j.snippet || '';
+  showView('tailor');
+  aiTailor();
+}
+
+async function triggerBot(){
+  const {ghUser, ghRepo, ghToken} = state.settings;
+  if(!ghToken) return alert('Set GitHub PAT in settings!');
+  try {
+    const res = await fetch(`https://api.github.com/repos/${ghUser}/${ghRepo}/actions/workflows/scrape.yml/dispatches`, {
+      method: 'POST', headers: {'Authorization': `Bearer ${ghToken}`, 'Accept': 'application/vnd.github.v3+json'},
+      body: JSON.stringify({ref: 'main'})
+    });
+    if(!res.ok) throw new Error("Failed. Check PAT permissions.");
+    alert('Bot triggered! Wait 5 mins then Sync Cloud.');
+  } catch(e) { alert(e.message); }
+}
+
+async function callGemini(prompt) {
+  const key = state.settings.geminiKey;
+  if(!key) throw new Error("Add Gemini API Key in Settings");
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({contents: [{parts: [{text: prompt}]}]})
+  });
+  const data = await res.json();
+  if(data.error) throw new Error(data.error.message);
+  return data.candidates[0].content.parts[0].text;
+}
+
+async function aiTailor(){
+  if(!jobDescription.value) return alert('Paste JD first!');
+  draftOutput.value = "AI is writing...";
+  const prompt = `Write a tailored resume summary and a 150-word cover letter for this job. Job: ${mTitle.value}. JD: ${jobDescription.value}`;
+  try {
+    draftOutput.value = await callGemini(prompt);
+  } catch(e) { draftOutput.value = "Error: " + e.message; }
+}
+
+renderCloudJobs();
+</script></body></html>

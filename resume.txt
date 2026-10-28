@@ -1,0 +1,93 @@
+GUJJA YESHWANTH
+Hyderabad, India | +91 7095071936 | gujjayeshwanthofficial@gmail.com | linkedin.com/in/yeshwanthgujja | github.com/Yeshwanth-Gujja
+
+PROFESSIONAL SUMMARY
+Computer Science undergraduate (B.Tech, 2027) skilled in Python, React, and FastAPI, with hands-on experience building automation tools, data pipelines, and AI-integrated applications. Experienced in designing REST APIs, working with LLM-based agents and RAG pipelines, and building end-to-end systems, from web scrapers and GitHub analytics dashboards to file automation and code analysis tools. AWS and Microsoft certified in Agentic AI and MLOps, with a strong foundation in DSA, OOP, and system design.
+
+[+] Alternate summaries (swap per role)
+
+Full-Stack: Aspiring full-stack developer with hands-on experience in React, Next.js, Node.js, and FastAPI. Builds responsive UIs, scalable REST APIs, and real-time features with WebSockets, backed by PostgreSQL and MongoDB.
+AI/ML: Computer Science undergraduate focused on applied AI, building LLM agents, RAG pipelines, and ML workflows. Experienced with PyTorch, Scikit-learn, embeddings, pgvector, and MLflow for experiment tracking.
+Backend/Cloud: Backend-focused engineering student experienced in designing REST APIs and containerized services with Docker, Kubernetes, and AWS. Comfortable with PostgreSQL, Redis, CI/CD, and system design fundamentals.
+
+TECHNICAL SKILLS
+
+Languages: Python, TypeScript, JavaScript, SQL, C++, C, [+] Java, Bash
+Frontend: React.js, Next.js, HTML5, CSS3, Tailwind CSS, Bootstrap, Zustand, [+] Redux, Responsive Design, Accessibility (WCAG basics)
+Backend & APIs: Node.js, Express.js, FastAPI, Django, REST APIs, WebSockets, OpenAPI/Swagger, [+] GraphQL, JWT/OAuth2 Authentication, Microservices, Pydantic, Celery
+Databases & Storage: PostgreSQL, MongoDB, Redis, Firebase, pgvector, [+] SQLAlchemy, Prisma, Database Design & Indexing
+AI/ML: NumPy, Pandas, Scikit-learn, PyTorch, Machine Learning, Deep Learning, NLP, Feature Engineering, Model Evaluation, [+] Hugging Face Transformers, Matplotlib, Data Visualization
+Generative AI: LLMs (OpenAI, Anthropic), RAG, Embeddings, Prompt Engineering, AI Agents, Function Calling / Structured Output, [+] LangChain, LangGraph, Vector Databases, Multi-Agent Systems, LLM Evaluation
+Cloud, DevOps & MLOps: AWS (EC2, S3, Lambda, API Gateway), Docker, Kubernetes, CI/CD (GitHub Actions), Nginx, MLflow, [+] Docker Compose, Monitoring & Logging, Infrastructure Basics
+Testing & Development Tools: PyTest, Jest, Playwright, Postman, Git, GitHub, Linux, VS Code, Jupyter, Figma, [+] Swagger UI, Agile/Scrum, Code Review
+Core CS: Data Structures & Algorithms, OOP, DBMS, Operating Systems, Computer Networks, System Design, [+] Design Patterns, Concurrency Basics
+
+PROJECTS
+
+AI DevOps Copilot: Autonomous Incident Response Agent
+FastAPI, LangGraph, React, WebSockets, PostgreSQL + pgvector, AWS, Docker
+
+Built a multi-agent system that monitors CI/CD pipelines and application logs in real time, autonomously diagnosing failures and proposing fixes through tool-calling agents.
+Implemented a RAG pipeline over historical incident reports and codebase docs using pgvector embeddings to ground agent reasoning and cut hallucinated fixes.
+Shipped a full-stack app with a React dashboard streaming live agent reasoning traces over WebSockets and a FastAPI backend orchestrating workflows on AWS.
+[+] Designed role-specific agents (log analyzer, root-cause finder, fix proposer) with structured outputs, so each step is traceable and auditable.
+[+] Added automated tests with PyTest and a GitHub Actions pipeline to validate agent tools and API endpoints on every commit.
+
+Prompt-to-Product: Full-Stack App Generator from Natural Language
+Next.js, FastAPI, LLM Function Calling, WebSockets, Docker
+
+Designed an AI agent pipeline that turns a plain-language product spec into a scaffolded full-stack app: React frontend, FastAPI backend, and database schema.
+Used structured output and function calling to translate specs into component trees, API routes, and models, then auto-generated and validated code in a sandbox.
+Built a live preview environment with WebSocket-streamed build logs and an iterative chat interface for refining the generated application.
+[+] Added schema validation and retry loops for LLM output to cut malformed generations and improve build success rate.
+[+] Containerized sandboxed builds with Docker to isolate generated code safely.
+
+Agent Forge: Self-Hosted LLM Agent Orchestration Framework
+Python, FastAPI, React, Redis, PostgreSQL + pgvector, Kubernetes, MLflow
+
+Architected an extensible framework for building multi-agent LLM systems with pluggable tools, long-term vector memory, and role-based agent collaboration.
+Built a tool marketplace letting agents dynamically discover and call REST tools via OpenAPI schemas, with sandboxed execution and audit logging.
+Containerized the platform with Docker/Kubernetes and used MLflow to track agent performance, prompt versions, and evaluation metrics across experiments.
+[+] Used Redis for task queues and short-term agent state to support concurrent agent runs.
+
+[+] Additional projects (from your summary; add only the ones you built)
+
+GitHub Analytics Dashboard (React, Node.js/FastAPI, GitHub REST API, Chart.js): Built a dashboard visualizing repository activity, commit trends, languages, and contributor stats via the GitHub API.
+Web Scraper & Data Pipeline (Python, BeautifulSoup/Scrapy, Pandas, PostgreSQL): Built scrapers that collect, clean, and store structured data, with scheduling and error handling.
+File Automation Tool (Python, OS/Pathlib): Automated file organization, renaming, and batch processing to cut manual effort.
+Code Analysis Tool (Python, AST): Built a tool that parses source code to report complexity, structure, and style issues.
+
+EXPERIENCE
+
+Talent Acquisition Intern | Kaltech Soft (May 2026 – August 2026)
+
+Sourced and screened candidate profiles across job portals and LinkedIn to build qualified talent pipelines for open roles.
+Coordinated end-to-end recruitment activities including resume shortlisting, interview scheduling, and candidate follow-ups.
+Maintained recruitment trackers and reports, improving visibility into hiring pipeline status and turnaround time.
+[+] Collaborated with hiring managers to understand technical requirements and screen candidates for software and IT roles.
+[+] Communicated with candidates and stakeholders professionally, strengthening written and verbal communication skills.
+
+EDUCATION
+B.Tech in Computer Science and Engineering
+Kasireddy Narayanreddy College of Engineering and Research, JNTUH | Expected Graduation: 2027
+
+[+] Relevant Coursework: Data Structures & Algorithms, DBMS, Operating Systems, Computer Networks, OOP, Machine Learning, Software Engineering
+
+CERTIFICATIONS
+
+AWS: Agentic AI Demonstrated
+Microsoft Applied Skills: Develop an Agent with Integrated Tools
+AWS: MLOps Demonstrated
+Microsoft Applied Skills: Develop a Generative AI Chat App Using the Microsoft Foundry SDK
+
+ACHIEVEMENTS
+
+Actively solving Data Structures & Algorithms problems on LeetCode (leetcode.com/u/Yeshwanth_Gujja/)
+[+] Solved [X]+ problems on LeetCode across arrays, trees, graphs, and dynamic programming (fill in your real number)
+[+] Earned four industry certifications from AWS and Microsoft in AI agents and MLOps
+
+SOFT SKILLS
+Analytical Problem Solving, Adaptability, Communication, Team Collaboration, [+] Time Management, Ownership & Accountability, Quick Learner
+
+[+] LANGUAGES
+English, Telugu, Hindi (adjust to what you speak)
