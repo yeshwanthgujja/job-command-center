@@ -8,6 +8,10 @@ TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 JOA_API_KEY = os.environ["JOA_API_KEY"]
 
+DATA_DIR = "job_data"                       # ← new parent folder
+CSV_PATH = os.path.join(DATA_DIR, "jobs.csv")
+INBOX_DIR = os.path.join(DATA_DIR, "inbox")
+
 FIELDS = ["company", "title", "location", "url", "source", "role_group", "date_found", "snippet"]
 
 def normalize(title, company, location, url, source, role_group, snippet=""):
@@ -17,7 +21,6 @@ def normalize(title, company, location, url, source, role_group, snippet=""):
         date_found=datetime.utcnow().strftime("%Y-%m-%d"), snippet=snippet[:300],
     )
 
-# 1) JobSpy — broad board scraping
 def scrape_jobspy():
     out = []
     for group, terms in ROLE_GROUPS.items():
@@ -41,7 +44,6 @@ def scrape_jobspy():
                 print(f"jobspy failed for {term}: {e}")
     return out
 
-# 2) HireHunt — India-focused boards
 def scrape_hirehunt():
     out = []
     for group in ["swe_junior", "ai_genai", "data_engineering", "devops_cloud", "internships"]:
@@ -63,7 +65,6 @@ def scrape_hirehunt():
             print(f"hirehunt failed for {term}: {e}")
     return out
 
-# 3) JOA — corrected endpoint, parameter, and response key
 def scrape_joa():
     if not JOA_API_KEY:
         return []
@@ -83,11 +84,9 @@ def scrape_joa():
                 timeout=30,
             )
             if resp.status_code == 401:
-                print("JOA: invalid key")
-                break
+                print("JOA: invalid key"); break
             if resp.status_code == 402:
-                print("JOA: monthly record limit reached")
-                break
+                print("JOA: monthly record limit reached"); break
             resp.raise_for_status()
             for job in resp.json().get("data", []):
                 out.append(normalize(
@@ -109,20 +108,20 @@ def dedupe(jobs, existing_urls):
     return fresh
 
 def save(fresh):
-    path = "data/jobs.csv"
-    write_header = not os.path.exists(path)
-    os.makedirs("data", exist_ok=True)
-    with open(path, "a", newline="", encoding="utf-8") as f:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    write_header = not os.path.exists(CSV_PATH)
+    with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         if write_header:
             writer.writeheader()
         writer.writerows(fresh)
 
     day = datetime.utcnow().strftime("%Y-%m-%d")
-    os.makedirs(f"inbox/{day}", exist_ok=True)
+    day_dir = os.path.join(INBOX_DIR, day)
+    os.makedirs(day_dir, exist_ok=True)
     for j in fresh[:20]:
         safe = f"{j['company']}_{j['title']}".replace("/", "_")[:80]
-        with open(f"inbox/{day}/{safe}.md", "w", encoding="utf-8") as f:
+        with open(os.path.join(day_dir, f"{safe}.md"), "w", encoding="utf-8") as f:
             f.write(f"# {j['title']} @ {j['company']}\n\n"
                     f"- URL: {j['url']}\n- Source: {j['source']}\n"
                     f"- Role group: {j['role_group']}\n- Location: {j['location']}\n\n"
@@ -142,12 +141,12 @@ def telegram(fresh):
     )
 
 def main():
-    existing = pd.read_csv("data/jobs.csv")["url"].dropna().tolist() if os.path.exists("data/jobs.csv") else []
+    existing = pd.read_csv(CSV_PATH)["url"].dropna().tolist() if os.path.exists(CSV_PATH) else []
     jobs = scrape_jobspy() + scrape_hirehunt() + scrape_joa()
     fresh = dedupe(jobs, existing)
     save(fresh)
     telegram(fresh)
-    print(f"Saved {len(fresh)} new jobs")
+    print(f"Saved {len(fresh)} new jobs into {DATA_DIR}/")
 
 if __name__ == "__main__":
     main()
