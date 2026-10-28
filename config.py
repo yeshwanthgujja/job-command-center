@@ -15,13 +15,22 @@ ROLE_GROUPS = {
     "tech_writing_devrel": ["technical writer", "developer advocate", "DevRel"],
     "product_ba": ["product analyst", "business analyst", "associate product manager"],
     "automation_rpa": ["automation engineer", "RPA developer", "workflow automation"],
-    "internships": [
-        "software engineer intern", "AI ML intern", "data analyst intern",
-        "DevOps intern", "frontend intern", "backend intern",
-    ],
+    "internships": ["software engineer intern", "AI ML intern", "data analyst intern",
+                    "DevOps intern", "frontend intern", "backend intern"],
     "campus_mass": ["TCS Digital", "Infosys Specialist Programmer", "Wipro Turbo", "Accenture ASE"],
 }
 
+PRIORITY_GROUPS_JOBSPY = [
+    "swe_junior", "frontend", "backend", "fullstack",
+    "ai_genai", "ml_data_science", "data_engineering", "devops_cloud",
+]
+
 LOCATION = "India"
-RESULTS_PER_QUERY = 20
-JOA_QUERIES = 6   # 6 × 5 × 30 days ≈ 900 records/month, under the 1,000 cap
+RESULTS_PER_QUERY = 8
+JOA_QUERIES = 6
+
+MIN_SCORE_MARKDOWN = 5
+MIN_SCORE_TELEGRAM = 6
+MAX_TELEGRAM_JOBS = 10
+MAX_MARKDOWN_PER_RUN = 50
+MAX_CSV_ROWS = 5000
