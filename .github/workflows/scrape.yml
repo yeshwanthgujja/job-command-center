@@ -1,0 +1,31 @@
+name: job-scrape
+
+on:
+  schedule:
+    - cron: "30 3 * * *"      # 9:00 AM IST (UTC+5:30)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python scraper.py
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          JOA_API_KEY: ${{ secrets.JOA_API_KEY }}
+      - name: Commit results
+        run: |
+          git config user.name "job-bot"
+          git config user.email "job-bot@users.noreply.github.com"
+          git add data/jobs.csv inbox/
+          git diff --cached --quiet || git commit -m "jobs: $(date -u +%F-%H%M)"
+          git push
