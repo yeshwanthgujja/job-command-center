@@ -1,4 +1,3 @@
-# config.py
 ROLE_GROUPS = {
     "swe_junior": ["software engineer", "SDE", "software developer", "graduate engineer trainee"],
     "swe_mid": ["software engineer II", "SDE-2", "product engineer"],
@@ -16,7 +15,7 @@ ROLE_GROUPS = {
     "tech_writing_devrel": ["technical writer", "developer advocate", "DevRel"],
     "product_ba": ["product analyst", "business analyst", "associate product manager"],
     "automation_rpa": ["automation engineer", "RPA developer", "workflow automation"],
-    "internships": [  # P1 internship layer
+    "internships": [
         "software engineer intern", "AI ML intern", "data analyst intern",
         "DevOps intern", "frontend intern", "backend intern",
     ],
@@ -24,5 +23,5 @@ ROLE_GROUPS = {
 }
 
 LOCATION = "India"
-RESULTS_PER_QUERY = 20   # conservative to stay within free tiers
-JOA_QUERIES = 8           # JOA: 1,000 records/month, so 8 queries × 20 results = 160/run
+RESULTS_PER_QUERY = 20
+JOA_QUERIES = 6   # 6 × 5 × 30 days ≈ 900 records/month, under the 1,000 cap
