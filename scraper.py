@@ -2,7 +2,7 @@
 import os, csv, requests, pandas as pd
 from datetime import datetime
 from jobspy import scrape_jobs
-from jobhunter import scrape_jobs as hirehunt_scrape
+from hirehunt import scrape_jobs as hirehunt_scrape
 from config import ROLE_GROUPS, LOCATION, RESULTS_PER_QUERY, JOA_QUERIES
 
 # --- credentials ---
@@ -78,9 +78,9 @@ def scrape_joa():
         term = ROLE_GROUPS[group][0]
         try:
             resp = requests.get(
-                "https://api.jobopportunitiesapi.org/job_search",
+                "https://api.jobopportunitiesapi.org/v1/jobs",
                 headers=headers,
-                params={"query": term, "country": "IN", "limit": 5},
+                params={"title": term, "country": "IN", "limit": 5},
                 timeout=30,
             )
             if resp.status_code == 401:
@@ -90,7 +90,7 @@ def scrape_joa():
                 print("JOA: monthly record limit reached")
                 break
             data = resp.json()
-            for job in data.get("results", []):
+            for job in r.json()["data"]:
                 out.append(normalize(
                     job.get("title"), job.get("company"), job.get("location"),
                     job.get("url"), "joa", group, job.get("description", "")[:300],
