@@ -1,8 +1,9 @@
+# scraper.py
 import os, csv, requests, pandas as pd
 from datetime import datetime
 from jobspy import scrape_jobs
 from hirehunt import scrape_jobs as hirehunt_scrape
-from scoring import compute_fit, llm_enhance
+from scorer import compute_fit, llm_enhance
 from config import (
     ROLE_GROUPS, PRIORITY_GROUPS_JOBSPY, LOCATION, RESULTS_PER_QUERY,
     JOA_QUERIES, MIN_SCORE_MARKDOWN, MIN_SCORE_TELEGRAM,
@@ -29,9 +30,13 @@ def rotate_csv_if_needed():
     if not os.path.exists(CSV_PATH): return
     try: df = pd.read_csv(CSV_PATH)
     except: return
+    
+    # Rotate if schema changed OR file is too big
     if "llm_explanation" not in df.columns or len(df) >= MAX_CSV_ROWS:
         os.makedirs(ARCHIVE_DIR, exist_ok=True)
-        os.rename(CSV_PATH, os.path.join(ARCHIVE_DIR, f"jobs_legacy_{datetime.utcnow().strftime('%Y%m')}.csv"))
+        stamp = datetime.utcnow().strftime("%Y%m")
+        os.rename(CSV_PATH, os.path.join(ARCHIVE_DIR, f"jobs_legacy_{stamp}.csv"))
+        print(f"Archived old CSV to {ARCHIVE_DIR}")
 
 def scrape_jobspy():
     out = []
@@ -44,7 +49,8 @@ def scrape_jobspy():
             for _, row in df.iterrows():
                 out.append(normalize(row.get("title"), row.get("company"), row.get("location"),
                                      row.get("job_url"), row.get("site"), group))
-        except Exception as e: print(f"jobspy failed: {e}")
+        except Exception as e: 
+            print(f"jobspy failed for {term}: {e}")
     return out
 
 def scrape_hirehunt():
@@ -57,7 +63,8 @@ def scrape_hirehunt():
                                      job_kind="internship" if group == "internships" else "job")
             for j in result.jobs:
                 out.append(normalize(j.title, j.company, j.city or j.location, j.job_url, j.source, group, j.description or ""))
-        except Exception as e: print(f"hirehunt failed: {e}")
+        except Exception as e: 
+            print(f"hirehunt failed for {term}: {e}")
     return out
 
 def scrape_joa():
@@ -70,25 +77,31 @@ def scrape_joa():
         try:
             resp = requests.get("https://api.jobopportunitiesapi.org/v1/jobs", headers=headers,
                                 params={"title": term, "country": "IN", "limit": 5}, timeout=30)
+            if resp.status_code == 401: break
+            if resp.status_code == 402: break
             resp.raise_for_status()
             for job in resp.json().get("data", []):
                 out.append(normalize(job.get("title"), job.get("company"), job.get("location"),
                                      job.get("apply_url") or job.get("url"), "joa", group, job.get("description", "")[:300]))
-        except Exception as e: print(f"JOA failed: {e}")
+        except Exception as e: 
+            print(f"JOA failed for {group}: {e}")
     return out
 
 def dedupe(jobs, existing_urls):
-    seen = set(existing_urls); fresh = []
+    seen = set(existing_urls)
+    fresh = []
     for j in jobs:
         if j["url"] and j["url"] not in seen:
-            seen.add(j["url"]); fresh.append(j)
+            seen.add(j["url"])
+            fresh.append(j)
     return fresh
 
 def save(fresh):
+    # 1. Base rule scoring
     for j in fresh:
         j["fit_score"], j["fit_reason"] = compute_fit(j)
 
-    # We only run Gemini on the top 15 jobs to save API limits
+    # 2. LLM enhancement for top candidates only
     top_candidates = sorted([j for j in fresh if j["fit_score"] >= MIN_SCORE_TELEGRAM], key=lambda x: x["fit_score"], reverse=True)[:15]
     for j in top_candidates:
         j["llm_explanation"], j["llm_gaps"] = llm_enhance(j)
@@ -98,6 +111,7 @@ def save(fresh):
         if "llm_explanation" not in j:
             j["llm_explanation"], j["llm_gaps"] = "", ""
 
+    # 3. Save to CSV
     os.makedirs(DATA_DIR, exist_ok=True)
     write_header = not os.path.exists(CSV_PATH)
     with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
@@ -105,6 +119,7 @@ def save(fresh):
         if write_header: w.writeheader()
         w.writerows(fresh)
 
+    # 4. Save Markdown files
     good = [j for j in fresh if j["fit_score"] >= MIN_SCORE_MARKDOWN]
     good = sorted(good, key=lambda x: x["fit_score"], reverse=True)[:MAX_MARKDOWN_PER_RUN]
 
