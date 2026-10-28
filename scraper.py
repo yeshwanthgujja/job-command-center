@@ -3,6 +3,7 @@ from datetime import datetime
 from jobspy import scrape_jobs
 from hirehunt import scrape_jobs as hirehunt_scrape
 from config import ROLE_GROUPS, LOCATION, RESULTS_PER_QUERY, JOA_QUERIES
+from scoring import compute_fit
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
@@ -12,7 +13,7 @@ DATA_DIR = "job_data"                       # ← new parent folder
 CSV_PATH = os.path.join(DATA_DIR, "jobs.csv")
 INBOX_DIR = os.path.join(DATA_DIR, "inbox")
 
-FIELDS = ["company", "title", "location", "url", "source", "role_group", "date_found", "snippet"]
+FIELDS = ["company", "title", "location", "url", "source", "role_group","date_found", "snippet", "fit_score", "fit_reason",]
 
 def normalize(title, company, location, url, source, role_group, snippet=""):
     return dict(
@@ -108,6 +109,10 @@ def dedupe(jobs, existing_urls):
     return fresh
 
 def save(fresh):
+    # score every job before writing
+    for j in fresh:
+        j["fit_score"], j["fit_reason"] = compute_fit(j)
+
     os.makedirs(DATA_DIR, exist_ok=True)
     write_header = not os.path.exists(CSV_PATH)
     with open(CSV_PATH, "a", newline="", encoding="utf-8") as f:
@@ -123,6 +128,8 @@ def save(fresh):
         safe = f"{j['company']}_{j['title']}".replace("/", "_")[:80]
         with open(os.path.join(day_dir, f"{safe}.md"), "w", encoding="utf-8") as f:
             f.write(f"# {j['title']} @ {j['company']}\n\n"
+                    f"- **Fit score:** {j['fit_score']}/10\n"
+                    f"- **Why:** {j['fit_reason']}\n"
                     f"- URL: {j['url']}\n- Source: {j['source']}\n"
                     f"- Role group: {j['role_group']}\n- Location: {j['location']}\n\n"
                     f"{j['snippet']}\n")
@@ -130,9 +137,19 @@ def save(fresh):
 def telegram(fresh):
     if not fresh:
         return
-    lines = [f"*{len(fresh)} new roles found*"]
-    for j in fresh[:12]:
-        lines.append(f"• [{j['title']} @ {j['company']}]({j['url']}) — {j['role_group']}")
+    # sort by fit score, highest first
+    fresh = sorted(fresh, key=lambda x: x.get("fit_score", 0), reverse=True)
+
+    lines = [f"*{len(fresh)} new roles — sorted by fit*"]
+    for i, j in enumerate(fresh[:10]):
+        prefix = "⭐" if i < 5 else "•"
+        lines.append(
+            f"{prefix} [{j['fit_score']}/10] [{j['title']} @ {j['company']}]({j['url']})"
+            f" — _{j['role_group']}_"
+        )
+    if len(fresh) > 10:
+        lines.append(f"\n_+{len(fresh)-10} more in `job_data/jobs.csv`_")
+
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
         json={"chat_id": TELEGRAM_CHAT_ID, "text": "\n".join(lines),
