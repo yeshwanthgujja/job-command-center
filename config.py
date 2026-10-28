@@ -1,6 +1,6 @@
+# config.py
 ROLE_GROUPS = {
     "swe_junior": ["software engineer", "SDE", "software developer", "graduate engineer trainee"],
-    "swe_mid": ["software engineer II", "SDE-2", "product engineer"],
     "frontend": ["frontend developer", "react developer", "next.js developer", "UI engineer"],
     "backend": ["backend developer", "python developer", "fastapi developer", "node.js developer", "API developer"],
     "fullstack": ["full stack developer", "MERN developer", "full-stack engineer"],
@@ -15,8 +15,7 @@ ROLE_GROUPS = {
     "tech_writing_devrel": ["technical writer", "developer advocate", "DevRel"],
     "product_ba": ["product analyst", "business analyst", "associate product manager"],
     "automation_rpa": ["automation engineer", "RPA developer", "workflow automation"],
-    "internships": ["software engineer intern", "AI ML intern", "data analyst intern",
-                    "DevOps intern", "frontend intern", "backend intern"],
+    "internships": ["software engineer intern", "AI ML intern", "data analyst intern", "DevOps intern", "frontend intern", "backend intern"],
     "campus_mass": ["TCS Digital", "Infosys Specialist Programmer", "Wipro Turbo", "Accenture ASE"],
 }
 
