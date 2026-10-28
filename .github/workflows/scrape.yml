@@ -5,7 +5,7 @@ on:
     - cron: "30 3 * * *"      # 9:00 AM IST
   workflow_dispatch:
 
-# PREVENTS CONCURRENT RUNS FROM COLLIDING
+# FIX: Prevents overlapping runs from crashing into each other
 concurrency:
   group: job-scrape-lock
   cancel-in-progress: true
@@ -44,7 +44,7 @@ jobs:
           
           git commit -m "jobs: $(date -u +%F-%H%M)"
           
-          # RETRY LOOP WITH REBASE TO FIX PUSH REJECTIONS
+          # FIX: Retry loop with rebase to handle GitHub race conditions
           for i in 1 2 3; do
             if git push; then
               echo "Push successful"
